@@ -1,0 +1,214 @@
+#!/bin/bash
+
+# Print the stylized text banner in red
+echo -e "\033[1;36m"
+figlet -f slant "Scanner"
+echo "                                   By Soliman"
+echo -e "\033[0m"
+
+
+# Check if a domain and target_name was provided as a positional arguments
+if [ -z "$1" ] || [ -z "$2" ]; then
+    echo -e "\e[31mUsage: scanner <target_domain.com> <target_name>\e[0m"
+    exit 1
+fi
+
+
+# Set the domain and the target_name
+domain="$1"
+target_name="$2"
+
+
+
+# making dir for recon results
+target_path=/home/soliman/recon/$target_name
+mkdir $target_path
+pathto=/home/soliman/recon/$target_name/${domain}_recon
+mkdir $pathto
+
+echo -e "\e[1;34m[+] Running scan against $domain\e[0m"
+echo -e "\e[1;34m[+] Output will be redirected to $pathto\e[0m"
+
+
+echo -e "\n"
+
+# Subfinder
+echo -e "\e[1;34m[!] Running Subfinder...\e[0m"
+subfinder -d $domain -all -silent -o $pathto/SubfinderFor_${domain}.txt
+sbf_count=$(cat $pathto/SubfinderFor_${domain}.txt | wc -l)
+echo -e "\e[32m[+] $sbf_count Subdomains Has Been Found By Subfinder\e[0m"
+echo -e "\n"
+
+# assetfinder
+echo -e "\e[1;34m[!] Running Assetfinder...\e[0m"
+assetfinder --subs-only $domain | tee $pathto/AssetfinderFor_${domain}.txt
+aset_count=$(cat $pathto/AssetfinderFor_${domain}.txt | wc -l)
+echo -e "\e[32m[+] $aset_count Subdomains Has Been Found By Assetfinder\e[0m"
+echo -e "\n"
+
+# shosubgo
+echo -e "\e[1;34m[!] Running shosubgo...\e[0m"
+shosubgo -d $domain -s wrNdh9QSc5sKC3Za0m8TfUyffbq0Hk23 | tee $pathto/ShosubgoFor_${domain}.txt
+shsg_count=$(cat $pathto/ShosubgoFor_${domain}.txt | wc -l)
+echo -e "\e[32m[+] $shsg_count subdomains has been found by shosubgo\e[0m"
+echo -e "\n"
+: '
+# bbot 
+echo -e "\e[1;34m[!] Running BBOT...\e[0m"
+nohup bbot -t $domain -f subdomain-enum -o $pathto/bbot_results > /dev/null 2>&1 &
+bbot_pid=$!
+wait $bbot_pid
+cat $pathto/bbot_results/*/subdomains.txt
+bbot_count=$(cat $pathto/bbot_results/*/subdomains.txt | wc -l)
+echo -e "\e[32m[+] $bbot_count Subdomains Has Been Found By BBOT\e[0m"
+echo -e "\n"
+'
+
+# Amass
+# echo -e "\e[1;34m[!] Running Amass...\e[0m"
+# amass enum -d $domain --passive -silent -nocolor -o $pathto/SOME_AmassFor_${domain}.txt
+# grep -oP '([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})' $pathto/SOME_AmassFor_${domain}.txt | sort -u > $pathto/AmassFor_${domain}.txt
+# $amass_count=$(cat $pathto/AmassFor_${domain}.txt | wc -l)
+# echo -e "\e[32m[+] $amass_count Subdomains Has Been Found By amass\e[0m"
+# echo -e "\n"
+
+
+# crt.sh
+echo -e "\e[1;34m[!] Running crt.sh...\e[0m"
+curl --silent "https://crt.sh/?q=$domain&output=json" -o $pathto/SOMEcrtshFor_${domain} 
+jq -r ".[] | .name_value" $pathto/SOMEcrtshFor_${domain} > $pathto/crtshFor_${domain}.txt
+rm -rf $pathto/SOMEcrtshFor_${domain}
+cat $pathto/crtshFor_${domain}.txt
+crt_count=$(cat $pathto/crtshFor_${domain}.txt | wc -l)
+echo -e "\e[32m[+] $crt_count Subdomains Has Been Found By crt.sh\e[0m"
+echo -e "\n"
+
+
+# cloud recon
+: '
+    code here
+'
+
+
+# github-subdomains
+echo -e "\e[1;34m[!] Running github-subdomains...\e[0m"
+github-subdomains -d $domain -t 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 -o $pathto/GHSBD_For_${domain}.txt
+GHSBD_count=$(cat $pathto/GHSBD_For_${domain}.txt | wc -l)
+echo -e "\e[32m[+] $GHSBD_count Subdomains Has Been Found By github-subdomains\e[0m"
+echo -e "\n"
+
+
+# exstra subs
+
+: '
+while true; do
+    echo -e "\e[1;31m[?] Do you want to provide exstra subdomains? (Y/N)\e[0m"
+    read answer
+    case "$answer" in
+        [Yy])
+            # Prompt the user for input
+            echo "Enter the value (press Ctrl+D to finish):"
+            # Use 'Ctrl+D' to signal end-of-input
+            value=$(cat)
+
+            # Check if the user provided any input
+            if [ -n "$value" ]; then
+                echo $value > $pathto/exstraSubsFor_${domain}.txt
+
+            else
+                echo "No input provided. Exiting."
+            fi
+            ;;
+        [Nn])
+            break  # Exit the loop when the user chooses "No"
+            ;;
+        *)
+            echo "Invalid input. Please enter Y or N."
+            ;;
+    esac
+done
+'
+# $pathto/bbot_results/*/subdomains.txt
+
+# sorting
+echo -e "\e[1;34m[+] Combining the Results...\e[0m"
+cat $pathto/SubfinderFor_${domain}.txt $pathto/AssetfinderFor_${domain}.txt $pathto/ShosubgoFor_${domain}.txt $pathto/crtshFor_${domain}.txt $pathto/GHSBD_For_${domain}.txt | sort | uniq > $pathto/allSubdomainsFor_${domain}.txt
+allCount=$(cat $pathto/allSubdomainsFor_${domain}.txt | wc -l )
+echo -e "\e[32m[+] $allCount Subdomains Has Been Found\e[0m"
+echo -e "\n"
+
+# HTTPX
+echo -e "\e[1;34m[!] Running HTTPX...\e[0m"
+/usr/local/bin/httpx -l $pathto/allSubdomainsFor_${domain}.txt -o $pathto/liveSubs_for_${domain}.txt
+f_results_count=$(cat $pathto/liveSubs_for_${domain}.txt | wc -l)
+echo -e "\e[32m[+] We Have Got $f_results_count Live Subdomains\e[0m"
+echo -e "\n"
+
+# deleting unwanted files 
+rm $pathto/SubfinderFor_${domain}.txt
+rm $pathto/AssetfinderFor_${domain}.txt
+rm $pathto/ShosubgoFor_${domain}.txt
+# rm -rf $pathto/bbot_results
+# rm $pathto/SOME_AmassFor_${domain}.txt
+# rm $pathto/AmassFor_${domain}.txt
+rm $pathto/crtshFor_${domain}.txt
+rm $pathto/GHSBD_For_${domain}.txt
+
+
+
+# end recon
+
+# ------------------------------------------------------------------------------------------------------------------------------------
+
+# second, collect endpoints:
+
+
+#
+# output files discription:
+# ${domain}_endpoints.txt: is the domain endpoints file
+# potential_XSS.txt: is the endpoints which params maybe vulnrable to XSS
+# $pathto/potential_sqli.txt: is the endpoints which params maybe vulnrable to SQLi
+# potential_LFI.txt: is the endpoints which params maybe vulnrable to LFI
+# potential_openredirect.txt: is the endpoints which params maybe vulnrable to open redirect
+# ${domain}_js_files: is the js files for the domain
+# supposed to get only 6 files
+#
+
+# Set the sub-domains file
+file=$pathto/liveSubs_for_${domain}.txt
+
+
+# Get all URLs from the domain using Katana
+katana -u $file -c 10 --filter-regex '\.(jpg|jpeg|gif|css|tif|tiff|png|ttf|woff|woff2|ico|pdf|svg|otf|ttf)$' > $pathto/${domain}_endpoints.txt
+
+# Get all URLs from the domain using gau
+cat $file | gau | grep -E -v '\.(jpg|jpeg|gif|css|tif|tiff|png|ttf|woff|woff2|ico|pdf|svg|otf|ttf)$' >> $pathto/${domain}_endpoints.txt
+
+# Get all URLs from the domain using hakrawler
+cat $file | hakrawler | grep -E -v '\.(jpg|jpeg|gif|css|tif|tiff|png|ttf|woff|woff2|ico|pdf|svg|otf|ttf)$' >> $pathto/${domain}_endpoints.txt
+
+# Get all URLs from the domain using waybackurls
+cat $file | waybackurls | grep -E -v '\.(jpg|jpeg|gif|css|tif|tiff|png|ttf|woff|woff2|ico|pdf|svg|otf|ttf)$' >> $pathto/${domain}_endpoints.txt
+
+# sorting and get unique the results in a text file
+sort -u $pathto/${domain}_endpoints.txt | uro > $pathto/F_${domain}_endpoints.txt
+rm $pathto/${domain}_endpoints.txt && mv $pathto/F_${domain}_endpoints.txt $pathto/${domain}_endpoints.txt
+
+# trying GF patterns
+cat $pathto/${domain}_endpoints.txt | gf xss > $pathto/potential_XSS.txt
+cat $pathto/${domain}_endpoints.txt | gf sqli > $pathto/potential_sqli.txt
+cat $pathto/${domain}_endpoints.txt | gf lfi > $pathto/potential_LFI.txt
+cat $pathto/${domain}_endpoints.txt | gf redirect > $pathto/potential_openredirect.txt
+
+# collecting JS files
+cat $pathto/${domain}_endpoints.txt | grep ".js$" > $pathto/${domain}_js_files
+echo -e "\n"
+echo -e "\e[32m[+] results have been stored in $pathto\e[0m"
+
+
+# end collection
+
+# ------------------------------------------------------------------------------------------------------------------------------------
+
+# third, scan what you have got:
+

@@ -1,0 +1,16 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+     echo -e "\e[31mUsage: $0 <liveSubdomainsFile>\e[0m"
+    exit 1
+fi
+
+liveSubs="$1"
+fuzzingWordList=/home/soliman/wordlists/dirsearch_list.txt
+
+for i in $(cat $liveSubs); do
+    echo "$i" > output.txt;
+    ffuf -u $i/FUZZ -w $fuzzingWordList | uniFfuf >> output.txt;
+    cat output.txt | notify -bulk;
+    rm output.txt;
+done
